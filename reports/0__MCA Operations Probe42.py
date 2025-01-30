@@ -10,12 +10,14 @@ from PIL import Image
 import os
 import json
 from typing import Optional, Dict, Any
+import shutil
 
 # Placeholder URLs - replace with actual API endpoints
 MCA_COMPANY_MASTER_DATA_URL = "https://api.attestr.com/api/v2/public/corpx/business/master"
 MCA_DIRECTOR_MASTER_DATA_URL_TEMPLATE = "https://api.attestr.com/api/v2/public/corpx/director/master"
 MCA_DIRECTOR_SEARCH_URL_TEMPLATE = "https://api.attestr.com/api/v2/public/corpx/director/search"
 PROBE_COMPANY_DETAILS_URL = "https://api.probe42.in/probe_pro_sandbox/companies/{CinOrPan}/comprehensive-details"
+PROBE_COMPANY_DETAILS_PDF_URL = "https://api.probe42.in/probe_reports_sandbox/companies/{CinOrPan}/reports?type=pdf&client_name=AlvarezMarsal&unit=Crore&identifier_type=CIN"
 
 if 'logger' in st.session_state:
     logger = st.session_state.logger
@@ -63,8 +65,8 @@ def fetch_company_details_probe42(cin_or_pan: str, api_key: str) -> Dict[str, An
     try:
         response = requests.request("GET", url, headers=headers, data=payload)
         response.raise_for_status()
-        with open("sample.json", "w") as outfile: 
-            json.dump(response.json(), outfile)     
+        # with open("sample.json", "w") as outfile: 
+        #     json.dump(response.json(), outfile)     
         return response.json()
     except requests.exceptions.HTTPError as http_err:
         log_error(f"HTTP error: {http_err}")
@@ -75,6 +77,36 @@ def fetch_company_details_probe42(cin_or_pan: str, api_key: str) -> Dict[str, An
     except requests.exceptions.RequestException as req_err:
         log_error(f"Request exception: {req_err}")
     return {}   
+
+def fetch_company_details_probe42_pdf(cin_or_pan: str, api_key: str) -> Dict[str, Any]:
+    if os.path.exists(os.path.join('cache', cin_or_pan + '.pdf')):
+        return True
+    url = PROBE_COMPANY_DETAILS_PDF_URL.format(CinOrPan=cin_or_pan)
+    payload = []
+    headers = {
+        "x-api-key": api_key,
+        "x-api-version": "1.3"
+    }
+    payload = []
+    try:
+        response = requests.request("GET", url, headers=headers, data=payload)
+        response.raise_for_status()
+        with open('cache/'+cin_or_pan+'.pdf', 'wb') as f:
+            f.write(response.content)  
+        return True
+    except requests.exceptions.HTTPError as http_err:
+        log_error(f"HTTP error: {http_err}")
+        return False
+    except requests.exceptions.ConnectionError as conn_err:
+        log_error(f"Connection error: {conn_err}")
+        return False
+    except requests.exceptions.Timeout as timeout_err:
+        log_error(f"Timeout error: {timeout_err}")
+        return False
+    except requests.exceptions.RequestException as req_err:
+        log_error(f"Request exception: {req_err}")
+        return False
+    return False  
 
 def flatten_json(nested_json, parent_key="", sep="/"):
     """
@@ -96,7 +128,90 @@ def flatten_json(nested_json, parent_key="", sep="/"):
     
     return flattened_dict
 
+def process_company_master_data_pdf(file: BytesIO, file_type: str, auth_token: str) -> Optional[pd.DataFrame]:
+    
+    try:
+        if file_type == "csv":
+            df = pd.read_csv(file, dtype={'regInput': 'str'})
+        elif file_type in ["xls", "xlsx"]:
+            df = pd.read_excel(file, dtype={'regInput': 'str'})
+        else:
+            log_error("Unsupported file type. Please upload a CSV or XLSX file.")
+            return None
 
+        required_columns = ['sno', 'regInput']
+        if not all(column in df.columns for column in required_columns):
+            log_error("Uploaded file must contain columns: sno, regInput")
+            return None
+        
+        log_info("File successfully uploaded and validated.")
+        
+        expanded_rows = []
+        
+        for idx, row in df.iterrows():
+            sno = row['sno']
+            cin = row['regInput']
+            response_flattened = {}
+            flag1 = False
+            if pd.isna(cin) or str(cin).strip() == "":
+                log_warning(f"Sno {sno}: CIN is missing. Skipping.")
+                # df.at[idx, 'valid'] = False
+                # df.at[idx, 'message'] = "CIN is missing."
+                flag1 = True
+                continue
+            
+            # if api_source == "Probe42":
+            response = fetch_company_details_probe42_pdf(cin, auth_token)
+            # else:
+            #     response = {}
+            #     log_warning("Invalid API source selected")
+            
+            if response:
+                response_flattened['valid'] = True
+                response_flattened['message'] = "Data retrieved successfully. Download zip file."
+                shutil.copy2('cache/'+cin+'.pdf', 'downloads/zipfolder')
+                # df.at[idx, 'valid'] = True
+                # df.at[idx, 'company_name'] = response.get("data", {}).get("company", {}).get("legal_name", "")
+                # df.at[idx, 'incorporation_date'] = response.get("data", {}).get("company", {}).get("incorporation_date", "")
+                # df.at[idx, 'classification'] = response.get("data", {}).get("company", {}).get("classification", "")
+                # df.at[idx, 'status'] = response.get("data", {}).get("company", {}).get("status", "")
+                # df.at[idx, 'email'] = response.get("data", {}).get("company", {}).get("email", "")
+                # df.at[idx, 'website'] = response.get("data", {}).get("company", {}).get("website", "")
+                # df.at[idx, 'authorized_capital'] = response.get("data", {}).get("company", {}).get("authorized_capital", "")
+            else:
+                # df.at[idx, 'valid'] = False
+                # df.at[idx, 'message'] = "No data returned from API."
+                response_flattened['valid'] = False
+                response_flattened['message'] = "No data returned from API."
+                
+            if flag1:
+                response_flattened['valid'] = False
+                response_flattened['message'] = "CIN is missing."
+            
+            if flag1:
+                response_flattened['valid'] = False
+                response_flattened['message'] = "Missing CIN."
+                
+            response_flattened['sno'] = sno
+            response_flattened['regInput'] = cin
+            expanded_rows.append(response_flattened)
+        # print(expanded_rows)
+        df = pd.DataFrame(expanded_rows)
+        first_col = df.pop('message')
+        df.insert(0, 'message', first_col)
+        first_col = df.pop('valid')
+        df.insert(0, 'valid', first_col)
+        first_col = df.pop('regInput')
+        df.insert(0, 'regInput', first_col)
+        first_col = df.pop('sno')
+        df.insert(0, 'sno', first_col)
+        
+        return df
+
+    except Exception as e:
+        log_error(f"Error processing company data: {e}")
+        return None
+    
 def process_company_master_data(file: BytesIO, file_type: str, auth_token: str) -> Optional[pd.DataFrame]:
     
     try:
@@ -207,7 +322,7 @@ def runprobe():
             file_type = uploaded_file.name.split('.')[-1]
             if st.button("Run Company Master Data Verification"):
                 with st.spinner("Processing..."):
-                    processed_df = process_company_master_data(uploaded_file, file_type, probe_api_key)
+                    processed_df = process_company_master_data_pdf(uploaded_file, file_type, probe_api_key)
                 
                 if processed_df is not None:
                     st.success("Company Master Data Verification completed successfully.")
@@ -220,6 +335,24 @@ def runprobe():
                             file_name="company_master_data_results.csv",
                             mime='text/csv',
                         )
+                        shutil.make_archive('downloads/downloadable', 'zip', 'downloads/zipfolder')
+                        with open("downloads/downloadable.zip", "rb") as fp:
+                            st.download_button(
+                                label="Download ZIP",
+                                data=fp,
+                                file_name="downloadable.zip",
+                                mime="application/zip"
+                            )
+                        folder = 'downloads/zipfolder'
+                        for filename in os.listdir(folder):
+                            file_path = os.path.join(folder, filename)
+                            try:
+                                if os.path.isfile(file_path) or os.path.islink(file_path):
+                                    os.unlink(file_path)
+                                elif os.path.isdir(file_path):
+                                    shutil.rmtree(file_path)
+                            except Exception as e:
+                                log_error('Failed to delete %s. Reason: %s' % (file_path, e))
 # --------------------------- MCA Company Master Data API Functions ---------------------------
 
 def initiate_mca_company_master_data(cin: str, auth_token: str, charges: bool = False, efilings: bool = False, live: bool = False, fetch_live_on_cache_miss: bool = False) -> Dict[str, Any]:
@@ -834,7 +967,7 @@ if True:
         # st.write(f'Welcome *{st.session_state["name"]}*')
         probe_api_key = st.session_state.get("probe_api_key", "")
         if not probe_api_key:
-            st.warning("Please enter your Attestr Auth Token on the Home page to proceed.")
+            st.warning("Please enter your Probe Auth Token on the Home page to proceed.")
         else:
             runprobe()
     elif st.session_state['authentication_status'] is False:
