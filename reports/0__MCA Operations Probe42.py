@@ -296,10 +296,13 @@ def process_company_master_data(file: BytesIO, file_type: str, auth_token: str) 
         log_error(f"Error processing company data: {e}")
         return None
     
+
 def runprobe():
     st.header("MCA Operations")
     st.write("The Ministry of Corporate Affairs' (MCA) Registrar of Companies (ROC) office is responsible for overseeing company registration and administration. For a given name/pan, this API retrieves the live director information as registered in the  MCA database. Comprehensive company details including MCA data, financials, court records and more can be retrieved using this tool.")
-    
+    newpath = os.path.join('downloads', 'zipfolder') 
+    if not os.path.exists(newpath):
+        os.makedirs(newpath)
     probe_api_key = st.session_state.get("probe_api_key", "")
     if not probe_api_key:
         st.warning("Please enter your Probe42 API Key in the Home page settings.")
@@ -335,15 +338,15 @@ def runprobe():
                             file_name="company_master_data_results.csv",
                             mime='text/csv',
                         )
-                        shutil.make_archive('downloads/downloadable', 'zip', 'downloads/zipfolder')
-                        with open("downloads/downloadable.zip", "rb") as fp:
+                        shutil.make_archive(os.path.join('downloads','downloadable'), 'zip', os.path.join('downloads','zipfolder'))
+                        with open(os.path.join("downloads","downloadable.zip"), "rb") as fp:
                             st.download_button(
                                 label="Download ZIP",
                                 data=fp,
                                 file_name="downloadable.zip",
                                 mime="application/zip"
                             )
-                        folder = 'downloads/zipfolder'
+                        folder = os.path.join('downloads','zipfolder')
                         for filename in os.listdir(folder):
                             file_path = os.path.join(folder, filename)
                             try:
@@ -353,6 +356,7 @@ def runprobe():
                                     shutil.rmtree(file_path)
                             except Exception as e:
                                 log_error('Failed to delete %s. Reason: %s' % (file_path, e))
+
 # --------------------------- MCA Company Master Data API Functions ---------------------------
 
 def initiate_mca_company_master_data(cin: str, auth_token: str, charges: bool = False, efilings: bool = False, live: bool = False, fetch_live_on_cache_miss: bool = False) -> Dict[str, Any]:
