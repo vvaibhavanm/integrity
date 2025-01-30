@@ -1,0 +1,7 @@
+pandas==2.2.3
+Pillow==11.1.0
+Requests==2.32.3
+requests_cache==1.2.1
+st_pages==1.0.1
+streamlit==1.37.0
+streamlit-authenticator==0.4.0
