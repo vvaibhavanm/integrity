@@ -42,6 +42,10 @@ if 'google_api_key' not in st.session_state:
     st.session_state.google_api_key = ""
 if 'attestr_auth_token' not in st.session_state:
     st.session_state.attestr_auth_token = ""
+if 'invincible_clientid' not in st.session_state:
+    st.session_state.invincible_clientid = ""
+if 'invincible_secretkey' not in st.session_state:
+    st.session_state.invincible_secretkey = ""
 
 def main():
     st.header("Integrity Due-Diligence Co-Pilot")
@@ -110,6 +114,34 @@ def main():
     
     st.markdown("---")  # Separator
     
+    col1, col2 = st.columns(2)
+    with col1:
+        st.subheader("Invincible Client ID")
+        invincible_clientid = st.text_input(
+            "Enter your Invincible Client ID", 
+            type="password", 
+            value=st.session_state.get("invincible_clientid", ""), 
+            key="invincible_clientid_input"
+        )
+        if invincible_clientid:
+            st.session_state.invincible_clientid = invincible_clientid
+            st.success("Invincible Client ID is set for the session.")
+        else:
+            st.warning("Invincible Client ID is not set.")
+    with col2:
+        st.subheader("Invincible Secret Key")
+        
+        invincible_secretkey = st.text_input(
+            "Enter your Invincible Secret Key", 
+            type="password", 
+            value=st.session_state.get("invincible_secretkey", ""), 
+            key="invincible_secretkey_input"
+        )
+        if invincible_secretkey:
+            st.session_state.invincible_secretkey = invincible_secretkey
+            st.success("Invincible Secret Key is set for the session.")
+        else:
+            st.warning("Invincible Secret Key is not set.")
     st.write("""
         After setting up your API tokens, use the sidebar to navigate to the desired task.
     """)

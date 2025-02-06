@@ -26,13 +26,22 @@ company_itr = st.Page('reports/11__Company_ITR_Verification.py',icon='📄')
 court_records = st.Page('reports/12__Court_Record_Check.py',icon='⚖️')
 geocoding = st.Page('reports/13__Geocoding_Distance.py',icon='📍')
 home = st.Page('reports/Home.py',icon='🏠')
-    
+creditscore = st.Page('reports/14__Credit Score.py',icon='📈')
+pan_detailed = st.Page('reports/15___PAN_Detailed.py',icon='🆔')
+aadhar_to_pan = st.Page('reports/16___Aadhar_to_PAN.py',icon='🆔')
+pan_to_gst = st.Page('reports/17___PAN_to_GST.py',icon='💼')
+pan_to_cin = st.Page('reports/18___PAN_to_CIN.py',icon='🏢')
+gst_to_cin = st.Page('reports/19___GST_to_CIN.py',icon='🏢')
+phone_number = st.Page('reports/20___Phone_number_information.py',icon='📱')
+pan_to_father_name = st.Page('reports/21___PAN_to_Father_Name.py',icon='👨‍👦')
+pan_to_aadhar = st.Page('reports/22___PAN_to_Aadhar.py', icon='💼')
 pg = st.navigation(
 {
 "Homepage": [home],
 "Corporate":[mca_page, mca_page_probe, court_records, gst_page, company_itr],
 "Individual":[pan_page, driving_license, mobile_number, email_id, voter_id, vehicle_rc, bank_account, epfo_uan],
 "Miscellaneous":[geocoding],
+"Invincible APIs": [creditscore, pan_detailed, aadhar_to_pan, pan_to_cin, gst_to_cin, phone_number, pan_to_father_name, pan_to_aadhar]
 }
 )
 pg.run()
